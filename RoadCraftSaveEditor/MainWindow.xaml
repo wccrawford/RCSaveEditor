@@ -25,29 +25,36 @@
                        Text="No file loaded" Foreground="Gray"/>
         </StackPanel>
 
-        <!-- Search Section -->
+        <!-- Navigation Section -->
         <Border Grid.Row="1" BorderBrush="LightGray" BorderThickness="1" Padding="8" Margin="0,0,0,10" CornerRadius="4">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="Find:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBox x:Name="SearchTextBox" Width="250" Padding="4"
-                         KeyDown="SearchTextBox_KeyDown"/>
-                <Button Content="Find Next" Padding="10,4" Margin="8,0,0,0" Click="FindNextButton_Click"/>
-                <Button Content="Find Previous" Padding="10,4" Margin="8,0,0,0" Click="FindPreviousButton_Click"/>
-                <CheckBox x:Name="CaseSensitiveCheckBox" Content="Case Sensitive" VerticalAlignment="Center" Margin="15,0,0,0"/>
-                <TextBlock x:Name="SearchStatusText" VerticalAlignment="Center" Margin="15,0,0,0" Foreground="Gray"/>
+                <Button x:Name="BackButton" Content="Back" Padding="10,4" Click="BackButton_Click" IsEnabled="False"/>
+                <TextBlock x:Name="BreadcrumbText" VerticalAlignment="Center" Margin="15,0,0,0" Foreground="Gray"/>
             </StackPanel>
         </Border>
 
-        <!-- Content Editor Section -->
-        <TextBox Grid.Row="2" x:Name="ContentTextBox"
-                 IsReadOnly="False"
-                 AcceptsReturn="True"
-                 AcceptsTab="True"
-                 VerticalScrollBarVisibility="Auto"
-                 HorizontalScrollBarVisibility="Auto"
-                 FontFamily="Consolas"
-                 FontSize="12"
-                 TextWrapping="NoWrap"
-                 UndoLimit="100"/>
+        <!-- JSON Editor Section -->
+        <DataGrid Grid.Row="2"
+                  x:Name="JsonGrid"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  IsReadOnly="False"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Key" Binding="{Binding Key}" IsReadOnly="True" Width="2*"/>
+                <DataGridTextColumn Header="Type" Binding="{Binding ValueType}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="Value" Binding="{Binding DisplayValue, UpdateSourceTrigger=PropertyChanged}" Width="3*"/>
+                <DataGridTemplateColumn Header="Action" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Content="Open" Padding="8,3" Click="OpenChildButton_Click"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </Window>
