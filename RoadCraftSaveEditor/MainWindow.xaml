@@ -6,9 +6,10 @@
         xmlns:local="clr-namespace:RoadCraftSaveEditor"
         mc:Ignorable="d"
         Title="RoadCraft Save Editor" Height="600" Width="900">
-    <Window.InputBindings>
-        <KeyBinding Key="F" Modifiers="Control" Command="{Binding FocusSearchCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
-    </Window.InputBindings>
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -48,10 +49,18 @@
                 <DataGridTextColumn Header="Key" Binding="{Binding Key}" IsReadOnly="True" Width="2*"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding ValueType}" IsReadOnly="True" Width="*"/>
                 <DataGridTextColumn Header="Value" Binding="{Binding EditableValue, UpdateSourceTrigger=PropertyChanged}" Width="3*"/>
-                <DataGridTemplateColumn Header="Action" Width="*">
+                <DataGridTemplateColumn Header="Action" Width="70">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Content="Open" Padding="8,3" Click="OpenChildButton_Click"/>
+                            <Grid MinHeight="28">
+                                <Button Content="Open"
+                                        Padding="8,3"
+                                        MinHeight="24"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Click="OpenChildButton_Click"
+                                        Visibility="{Binding CanOpen, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            </Grid>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

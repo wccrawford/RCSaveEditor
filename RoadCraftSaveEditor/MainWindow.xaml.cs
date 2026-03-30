@@ -1,6 +1,5 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -118,11 +117,9 @@ public partial class MainWindow : Window
     private JsonNode? _currentJsonNode;
 
     public ObservableCollection<JsonEntryViewModel> VisibleEntries { get; } = new();
-    public ICommand FocusSearchCommand { get; }
 
     public MainWindow()
     {
-        FocusSearchCommand = new RelayCommand(() => JsonGrid.Focus());
         InitializeComponent();
         DataContext = this;
         JsonGrid.ItemsSource = VisibleEntries;
