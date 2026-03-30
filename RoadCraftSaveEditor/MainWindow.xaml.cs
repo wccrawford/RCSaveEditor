@@ -7,11 +7,23 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Input;
 using Microsoft.Win32;
 
 namespace RoadCraftSaveEditor;
+
+public enum JsonValueKindDisplay
+{
+    Object,
+    Array,
+    String,
+    Number,
+    Boolean,
+    Null,
+    Unknown
+}
 
 /// <summary>
 /// Stores information about the loaded save file for later saving
@@ -46,28 +58,35 @@ public class RelayCommand(Action execute, Func<bool>? canExecute = null) : IComm
 
 public class JsonEntryViewModel
 {
-    public required string Key { get; set; }
-    public required string ValueType { get; set; }
-    public required string? DisplayValue { get; set; }
-    public required JsonNode? Node { get; set; }
+    private readonly Action<JsonEntryViewModel, string?> _updateValue;
 
-    public static JsonEntryViewModel FromJson(string key, JsonNode? node)
+    public JsonEntryViewModel(
+        string key,
+        JsonNode? node,
+        Action<JsonEntryViewModel, string?> updateValue)
     {
-        return new JsonEntryViewModel
-        {
-            Key = key,
-            ValueType = GetJsonType(node),
-            DisplayValue = GetDisplayValue(node),
-            Node = node
-        };
+        Key = key;
+        Node = node;
+        _updateValue = updateValue;
+        ValueType = GetJsonType(node);
+        EditableValue = GetDisplayValue(node);
     }
+
+    public string Key { get; }
+    public JsonNode? Node { get; }
+    public string ValueType { get; }
+    public string? EditableValue { get; set; }
+
+    public bool CanOpen => Node is JsonObject or JsonArray;
+
+    public void CommitEdit() => _updateValue(this, EditableValue);
 
     private static string GetJsonType(JsonNode? node) => node switch
     {
         JsonObject => "Object",
         JsonArray => "Array",
         JsonValue value when value.TryGetValue<string>(out _) => "String",
-        JsonValue value when value.TryGetValue<bool>(out _) => "Bool",
+        JsonValue value when value.TryGetValue<bool>(out _) => "Boolean",
         JsonValue value when value.TryGetValue<int>(out _) => "Number",
         JsonValue value when value.TryGetValue<long>(out _) => "Number",
         JsonValue value when value.TryGetValue<double>(out _) => "Number",
@@ -77,22 +96,19 @@ public class JsonEntryViewModel
         _ => "Unknown"
     };
 
-    private static string? GetDisplayValue(JsonNode? node)
+    private static string? GetDisplayValue(JsonNode? node) => node switch
     {
-        return node switch
-        {
-            null => "null",
-            JsonObject => "{...}",
-            JsonArray => "[...]",
-            JsonValue value when value.TryGetValue<string>(out var s) => s,
-            JsonValue value when value.TryGetValue<bool>(out var b) => b ? "true" : "false",
-            JsonValue value when value.TryGetValue<decimal>(out var d) => d.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            JsonValue value when value.TryGetValue<double>(out var dbl) => dbl.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            JsonValue value when value.TryGetValue<long>(out var l) => l.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            JsonValue value when value.TryGetValue<int>(out var i) => i.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            _ => node?.ToJsonString()
-        };
-    }
+        null => "null",
+        JsonObject => "{...}",
+        JsonArray => "[...]",
+        JsonValue value when value.TryGetValue<string>(out var s) => s,
+        JsonValue value when value.TryGetValue<bool>(out var b) => b ? "true" : "false",
+        JsonValue value when value.TryGetValue<decimal>(out var d) => d.ToString(CultureInfo.InvariantCulture),
+        JsonValue value when value.TryGetValue<double>(out var dbl) => dbl.ToString(CultureInfo.InvariantCulture),
+        JsonValue value when value.TryGetValue<long>(out var l) => l.ToString(CultureInfo.InvariantCulture),
+        JsonValue value when value.TryGetValue<int>(out var i) => i.ToString(CultureInfo.InvariantCulture),
+        _ => node?.ToJsonString()
+    };
 }
 
 public partial class MainWindow : Window
@@ -106,6 +122,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        FocusSearchCommand = new RelayCommand(() => JsonGrid.Focus());
         InitializeComponent();
         DataContext = this;
         JsonGrid.ItemsSource = VisibleEntries;
@@ -118,12 +135,12 @@ public partial class MainWindow : Window
         if (_currentJsonNode is JsonObject obj)
         {
             foreach (var pair in obj)
-                VisibleEntries.Add(JsonEntryViewModel.FromJson(pair.Key, pair.Value));
+                VisibleEntries.Add(new JsonEntryViewModel(pair.Key, pair.Value, UpdateJsonEntryValue));
         }
         else if (_currentJsonNode is JsonArray arr)
         {
             for (var i = 0; i < arr.Count; i++)
-                VisibleEntries.Add(JsonEntryViewModel.FromJson(i.ToString(), arr[i]));
+                VisibleEntries.Add(new JsonEntryViewModel(i.ToString(), arr[i], UpdateJsonEntryValue));
         }
 
         BackButton.IsEnabled = _navigationStack.Count > 0;
@@ -136,6 +153,76 @@ public partial class MainWindow : Window
             return "Root";
 
         return "Root > " + string.Join(" > ", _navigationStack.Select(x => x.Name));
+    }
+
+    private void UpdateJsonEntryValue(JsonEntryViewModel entry, string? newValue)
+    {
+        if (_currentJsonNode is JsonObject obj && obj.TryGetPropertyValue(entry.Key, out var node))
+        {
+            obj[entry.Key] = ParseValue(node, newValue);
+        }
+        else if (_currentJsonNode is JsonArray arr && int.TryParse(entry.Key, out var index) && index >= 0 && index < arr.Count)
+        {
+            arr[index] = ParseValue(arr[index], newValue);
+        }
+
+        RefreshJsonView();
+    }
+
+    private static JsonNode? ParseValue(JsonNode? existingNode, string? newValue)
+    {
+        if (existingNode is JsonObject || existingNode is JsonArray)
+            return existingNode;
+
+        if (existingNode is JsonValue existingValue)
+        {
+            if (existingValue.TryGetValue<bool>(out _))
+            {
+                if (bool.TryParse(newValue, out var b))
+                    return JsonValue.Create(b);
+
+                throw new InvalidOperationException("Invalid boolean value.");
+            }
+
+            if (existingValue.TryGetValue<int>(out _))
+            {
+                if (int.TryParse(newValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i))
+                    return JsonValue.Create(i);
+
+                throw new InvalidOperationException("Invalid integer value.");
+            }
+
+            if (existingValue.TryGetValue<long>(out _))
+            {
+                if (long.TryParse(newValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l))
+                    return JsonValue.Create(l);
+
+                throw new InvalidOperationException("Invalid long value.");
+            }
+
+            if (existingValue.TryGetValue<decimal>(out _))
+            {
+                if (decimal.TryParse(newValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
+                    return JsonValue.Create(d);
+
+                throw new InvalidOperationException("Invalid decimal value.");
+            }
+
+            if (existingValue.TryGetValue<double>(out _))
+            {
+                if (double.TryParse(newValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var dbl))
+                    return JsonValue.Create(dbl);
+
+                throw new InvalidOperationException("Invalid number value.");
+            }
+
+            return JsonValue.Create(newValue);
+        }
+
+        if (newValue is null || string.Equals(newValue, "null", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return JsonValue.Create(newValue);
     }
 
     private void LoadFileButton_Click(object sender, RoutedEventArgs e)
@@ -206,11 +293,32 @@ public partial class MainWindow : Window
 
         if (_currentJsonNode != null)
         {
-            var name = entry.Key;
-            _navigationStack.Push((_currentJsonNode, name));
+            _navigationStack.Push((_currentJsonNode, entry.Key));
             _currentJsonNode = entry.Node;
             RefreshJsonView();
         }
+    }
+
+    private void JsonGrid_CellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
+    {
+        if (e.Row.Item is not JsonEntryViewModel entry)
+            return;
+
+        if (e.EditAction != System.Windows.Controls.DataGridEditAction.Commit)
+            return;
+
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            try
+            {
+                entry.CommitEdit();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Invalid value", MessageBoxButton.OK, MessageBoxImage.Warning);
+                RefreshJsonView();
+            }
+        }));
     }
 
     private void SaveFileButton_Click(object sender, RoutedEventArgs e)

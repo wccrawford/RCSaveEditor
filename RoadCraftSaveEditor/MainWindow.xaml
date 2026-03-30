@@ -42,11 +42,12 @@
                   IsReadOnly="False"
                   HeadersVisibility="Column"
                   SelectionMode="Single"
-                  SelectionUnit="FullRow">
+                  SelectionUnit="FullRow"
+                  CellEditEnding="JsonGrid_CellEditEnding">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Key" Binding="{Binding Key}" IsReadOnly="True" Width="2*"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding ValueType}" IsReadOnly="True" Width="*"/>
-                <DataGridTextColumn Header="Value" Binding="{Binding DisplayValue, UpdateSourceTrigger=PropertyChanged}" Width="3*"/>
+                <DataGridTextColumn Header="Value" Binding="{Binding EditableValue, UpdateSourceTrigger=PropertyChanged}" Width="3*"/>
                 <DataGridTemplateColumn Header="Action" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
